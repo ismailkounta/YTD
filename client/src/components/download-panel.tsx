@@ -58,7 +58,7 @@ export default function DownloadPanel({ videoInfo, selectedQuality, selectedForm
     }
 
     const downloadData = {
-      url: videoInfo.url || "https://www.youtube.com/watch?v=example", // This would come from the original URL
+      url: videoInfo.url,
       title: videoInfo.title,
       author: videoInfo.author,
       duration: videoInfo.duration,
