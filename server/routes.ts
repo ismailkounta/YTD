@@ -20,7 +20,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const videoDetails = info.videoDetails;
 
       // Get available formats
-      const formats = ytdl.filterFormats(info, 'videoandaudio').map(format => ({
+      const videoFormats = ytdl.filterFormats(info, 'videoandaudio' as any);
+      const formats = videoFormats.map((format: any) => ({
         quality: format.qualityLabel || format.quality,
         format: format.container,
         size: format.contentLength ? `~${Math.round(parseInt(format.contentLength) / 1024 / 1024)} MB` : 'Unknown',
@@ -28,11 +29,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }));
 
       // Add audio-only format
-      const audioFormats = ytdl.filterFormats(info, 'audioonly');
+      const audioFormats = ytdl.filterFormats(info, 'audioonly' as any);
       if (audioFormats.length > 0) {
         formats.push({
-          quality: 'Audio Only (MP3)',
-          format: 'mp3',
+          quality: 'Audio Only',
+          format: 'mp4',
           size: audioFormats[0].contentLength ? `~${Math.round(parseInt(audioFormats[0].contentLength) / 1024 / 1024)} MB` : 'Unknown',
           itag: audioFormats[0].itag,
         });
@@ -125,12 +126,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   async function startDownloadProcess(downloadId: number, url: string, quality: string) {
     try {
       const info = await ytdl.getInfo(url);
-      let format;
+      let format: any;
 
       if (quality.includes('Audio')) {
-        format = ytdl.chooseFormat(info, { quality: 'highestaudio' });
+        format = ytdl.chooseFormat(info, { quality: 'highestaudio' } as any);
       } else {
-        format = ytdl.chooseFormat(info, { quality: quality.toLowerCase() });
+        format = ytdl.chooseFormat(info, { quality: quality.toLowerCase() } as any);
       }
 
       const totalSize = parseInt(format.contentLength || '0');

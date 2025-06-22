@@ -33,6 +33,14 @@ export class MemStorage implements IStorage {
     const download: Download = {
       ...insertDownload,
       id,
+      progress: insertDownload.progress ?? 0,
+      author: insertDownload.author ?? null,
+      duration: insertDownload.duration ?? null,
+      thumbnail: insertDownload.thumbnail ?? null,
+      fileSize: insertDownload.fileSize ?? null,
+      status: insertDownload.status ?? "pending",
+      downloadSpeed: insertDownload.downloadSpeed ?? null,
+      timeRemaining: insertDownload.timeRemaining ?? null,
       createdAt: new Date(),
     };
     this.downloads.set(id, download);
