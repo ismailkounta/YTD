@@ -44,7 +44,6 @@ export default function DownloadPanel({ videoInfo, selectedQuality, selectedForm
   const { data: currentDownload } = useQuery({
     queryKey: ["/api/download", currentDownloadId],
     enabled: !!currentDownloadId,
-    refetchInterval: currentDownloadId && currentDownload?.status === "downloading" ? 1000 : false,
   });
 
   const handleDownload = () => {
@@ -73,8 +72,18 @@ export default function DownloadPanel({ videoInfo, selectedQuality, selectedForm
     startDownloadMutation.mutate(downloadData);
   };
 
-  const isDownloading = currentDownload?.status === "downloading";
-  const isCompleted = currentDownload?.status === "completed";
+  // Add polling for active downloads
+  const { data: pollingData } = useQuery({
+    queryKey: ["/api/download", currentDownloadId, "polling"],
+    enabled: !!currentDownloadId && currentDownload?.status === "downloading",
+    refetchInterval: 1000,
+  });
+
+  // Use polling data if available, otherwise use current download data
+  const downloadData = pollingData || currentDownload;
+  
+  const isDownloading = downloadData?.status === "downloading";
+  const isCompleted = downloadData?.status === "completed";
   const canDownload = videoInfo && selectedQuality && !isDownloading;
 
   return (
@@ -94,16 +103,16 @@ export default function DownloadPanel({ videoInfo, selectedQuality, selectedForm
           </Button>
           
           {/* Progress Bar */}
-          {isDownloading && currentDownload && (
+          {isDownloading && downloadData && (
             <div className="space-y-3">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Downloading...</span>
-                <span className="font-medium">{currentDownload.progress}%</span>
+                <span className="font-medium">{downloadData.progress}%</span>
               </div>
-              <Progress value={currentDownload.progress} className="w-full" />
+              <Progress value={downloadData.progress} className="w-full" />
               <div className="flex justify-between text-xs text-gray-500">
-                <span>{currentDownload.downloadSpeed || "Calculating..."}</span>
-                <span>{currentDownload.timeRemaining || "Calculating..."}</span>
+                <span>{downloadData.downloadSpeed || "Calculating..."}</span>
+                <span>{downloadData.timeRemaining || "Calculating..."}</span>
               </div>
             </div>
           )}
