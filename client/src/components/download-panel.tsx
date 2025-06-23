@@ -21,16 +21,26 @@ export default function DownloadPanel({ videoInfo, selectedQuality, selectedForm
 
   const startDownloadMutation = useMutation({
     mutationFn: async (downloadData: any) => {
-      const response = await apiRequest("POST", "/api/download/start", downloadData);
-      return response.json();
+      // Create a download link that will trigger the direct download
+      const link = document.createElement('a');
+      const params = new URLSearchParams();
+      Object.keys(downloadData).forEach(key => {
+        params.append(key, downloadData[key]);
+      });
+      
+      link.href = `/api/download/start?${params.toString()}`;
+      link.download = `${downloadData.title.replace(/[^a-zA-Z0-9\s]/g, '_').trim()}.mp4`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      return { success: true };
     },
-    onSuccess: (data) => {
-      setCurrentDownloadId(data.id);
+    onSuccess: () => {
       toast({
         title: "Download started",
-        description: "Your video is being downloaded",
+        description: "Your video is downloading to your device",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/downloads"] });
     },
     onError: (error: any) => {
       toast({
@@ -102,43 +112,14 @@ export default function DownloadPanel({ videoInfo, selectedQuality, selectedForm
             {startDownloadMutation.isPending ? "Starting..." : "Start Download"}
           </Button>
           
-          {/* Progress Bar */}
-          {isDownloading && downloadData && (
-            <div className="space-y-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Downloading...</span>
-                <span className="font-medium">{downloadData.progress}%</span>
-              </div>
-              <Progress value={downloadData.progress} className="w-full" />
-              <div className="flex justify-between text-xs text-gray-500">
-                <span>{downloadData.downloadSpeed || "Calculating..."}</span>
-                <span>{downloadData.timeRemaining || "Calculating..."}</span>
-              </div>
-            </div>
-          )}
-          
-          {/* Success State */}
-          {isCompleted && (
-            <Alert className="bg-green-50 border-green-200">
-              <CheckCircle className="h-4 w-4 text-green-600" />
-              <AlertDescription className="text-green-600">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="font-medium">Download Complete!</span>
-                    <br />
-                    Ready to download to your device
-                  </div>
-                  <Button
-                    onClick={() => {
-                      window.open(`/api/download/${currentDownloadId}/file`, '_blank');
-                    }}
-                    size="sm"
-                    className="ml-4 bg-green-600 hover:bg-green-700"
-                  >
-                    <Download className="mr-2 h-4 w-4" />
-                    Download File
-                  </Button>
-                </div>
+          {/* Download Status */}
+          {startDownloadMutation.isPending && (
+            <Alert className="bg-blue-50 border-blue-200">
+              <Download className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-blue-600">
+                <span className="font-medium">Download Started!</span>
+                <br />
+                Video is downloading to your device
               </AlertDescription>
             </Alert>
           )}

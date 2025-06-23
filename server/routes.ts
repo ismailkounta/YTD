@@ -102,28 +102,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Start download
-  app.post("/api/download/start", async (req, res) => {
+  // Direct download endpoint
+  app.get("/api/download/start", async (req, res) => {
     try {
-      const downloadData = insertDownloadSchema.parse(req.body);
+      const url = req.query.url as string;
+      const quality = req.query.quality as string;
+      const title = req.query.title as string;
 
-      // Basic URL validation (can be improved)
-      if (!downloadData.url.includes("youtube.com") && !downloadData.url.includes("youtu.be")) {
+      if (!ytdl.validateURL(url)) {
         return res.status(400).json({ message: "Invalid YouTube URL" });
       }
 
-      const download = await storage.createDownload({
-        ...downloadData,
-        status: "downloading",
-        progress: 0,
+      // Get video info and find the right format
+      const info = await ytdl.getInfo(url);
+      const allFormats = info.formats || [];
+      
+      let format;
+      if (quality.includes('Audio')) {
+        const audioFormats = allFormats.filter((f: any) => f.hasAudio && !f.hasVideo);
+        format = audioFormats.sort((a: any, b: any) => (b.audioBitrate || 0) - (a.audioBitrate || 0))[0];
+      } else {
+        format = allFormats.find((f: any) => 
+          f.hasVideo && f.hasAudio && 
+          (f.qualityLabel === quality || f.quality === quality)
+        ) || allFormats.find((f: any) => f.hasVideo && f.hasAudio);
+      }
+
+      if (!format) {
+        return res.status(400).json({ message: "Video format not available" });
+      }
+
+      // Set headers for direct download
+      const filename = `${title.replace(/[^a-zA-Z0-9\s]/g, '_').trim()}.${format.container || 'mp4'}`;
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Type', format.mimeType || 'video/mp4');
+      res.setHeader('Content-Length', format.contentLength || '0');
+      res.setHeader('Accept-Ranges', 'bytes');
+
+      // Stream the video directly to the client
+      const videoStream = ytdl.downloadFromInfo(info, { format });
+      videoStream.pipe(res);
+      
+      videoStream.on('error', (error) => {
+        console.error('Direct streaming error:', error);
+        if (!res.headersSent) {
+          res.status(500).json({ message: "Error streaming video" });
+        }
       });
 
-      // Start download process in background
-      startDownloadProcess(download.id, downloadData.url, downloadData.quality);
-
-      res.json(download);
+      console.log(`Direct download started for: ${title} (${quality})`);
+      
     } catch (error) {
-      console.error("Error starting download:", error);
+      console.error("Error starting direct download:", error);
       res.status(500).json({ message: "Failed to start download" });
     }
   });
