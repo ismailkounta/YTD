@@ -23,13 +23,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get available formats from the info object
       const allFormats = info.formats || [];
       
-      // Filter for video+audio formats
+      // Filter for video+audio formats and remove duplicates by quality
       const videoFormats = allFormats.filter((format: any) => 
-        format.hasVideo && format.hasAudio
+        format.hasVideo && format.hasAudio && format.qualityLabel
       );
       
-      const formats = videoFormats.map((format: any) => ({
-        quality: format.qualityLabel || format.quality || 'Unknown',
+      // Remove duplicate qualities and sort by quality (highest first)
+      const uniqueQualities = new Map();
+      videoFormats.forEach((format: any) => {
+        const quality = format.qualityLabel;
+        if (!uniqueQualities.has(quality)) {
+          uniqueQualities.set(quality, format);
+        }
+      });
+      
+      // Sort qualities in descending order (1080p, 720p, 480p, etc.)
+      const sortedFormats = Array.from(uniqueQualities.values()).sort((a: any, b: any) => {
+        const aHeight = parseInt(a.qualityLabel?.replace('p', '') || '0');
+        const bHeight = parseInt(b.qualityLabel?.replace('p', '') || '0');
+        return bHeight - aHeight;
+      });
+      
+      const formats = sortedFormats.map((format: any) => ({
+        quality: format.qualityLabel,
         format: format.container || 'mp4',
         size: format.contentLength ? `~${Math.round(parseInt(format.contentLength) / 1024 / 1024)} MB` : 'Unknown',
         itag: format.itag,
@@ -41,7 +57,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       
       if (audioFormats.length > 0) {
-        const bestAudio = audioFormats[0];
+        const bestAudio = audioFormats.sort((a: any, b: any) => 
+          (b.audioBitrate || 0) - (a.audioBitrate || 0)
+        )[0];
+        
         formats.push({
           quality: 'Audio Only',
           format: 'mp4',
