@@ -92,7 +92,8 @@ This is a full-stack YouTube video downloader application built with modern web 
 
 ```
 Changelog:
-- June 22, 2025. Initial setup
+- June 23, 2025. Applied Anthropic-inspired design system with warm color palette
+- June 22, 2025. Initial setup and direct download functionality
 ```
 
 ## User Preferences
