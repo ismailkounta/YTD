@@ -20,23 +20,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const info = await ytdl.getInfo(url);
       const videoDetails = info.videoDetails;
 
-      // Get available formats
-      const videoFormats = ytdl.filterFormats(info, 'videoandaudio' as any);
+      // Get available formats from the info object
+      const allFormats = info.formats || [];
+      
+      // Filter for video+audio formats
+      const videoFormats = allFormats.filter((format: any) => 
+        format.hasVideo && format.hasAudio
+      );
+      
       const formats = videoFormats.map((format: any) => ({
-        quality: format.qualityLabel || format.quality,
-        format: format.container,
+        quality: format.qualityLabel || format.quality || 'Unknown',
+        format: format.container || 'mp4',
         size: format.contentLength ? `~${Math.round(parseInt(format.contentLength) / 1024 / 1024)} MB` : 'Unknown',
         itag: format.itag,
       }));
 
       // Add audio-only format
-      const audioFormats = ytdl.filterFormats(info, 'audioonly' as any);
+      const audioFormats = allFormats.filter((format: any) => 
+        format.hasAudio && !format.hasVideo
+      );
+      
       if (audioFormats.length > 0) {
+        const bestAudio = audioFormats[0];
         formats.push({
           quality: 'Audio Only',
           format: 'mp4',
-          size: audioFormats[0].contentLength ? `~${Math.round(parseInt(audioFormats[0].contentLength) / 1024 / 1024)} MB` : 'Unknown',
-          itag: audioFormats[0].itag,
+          size: bestAudio.contentLength ? `~${Math.round(parseInt(bestAudio.contentLength) / 1024 / 1024)} MB` : 'Unknown',
+          itag: bestAudio.itag,
         });
       }
 
@@ -131,10 +141,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const info = await ytdl.getInfo(url);
       let format: any;
 
+      const allFormats = info.formats || [];
+      
       if (quality.includes('Audio')) {
-        format = ytdl.chooseFormat(info, { quality: 'highestaudio' } as any);
+        // Find best audio-only format
+        const audioFormats = allFormats.filter((f: any) => f.hasAudio && !f.hasVideo);
+        format = audioFormats.sort((a: any, b: any) => (b.audioBitrate || 0) - (a.audioBitrate || 0))[0];
       } else {
-        format = ytdl.chooseFormat(info, { quality: quality.toLowerCase() } as any);
+        // Find matching video format
+        format = allFormats.find((f: any) => 
+          f.hasVideo && f.hasAudio && 
+          (f.qualityLabel === quality || f.quality === quality)
+        ) || allFormats.find((f: any) => f.hasVideo && f.hasAudio);
       }
 
       const totalSize = parseInt(format.contentLength || '0');
