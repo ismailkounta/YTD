@@ -1,9 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Video, User, Eye, Calendar } from "lucide-react";
+import { Video, User, Eye, Calendar, Download } from "lucide-react";
 
 interface VideoMetadataProps {
   videoInfo: any;
@@ -88,29 +88,49 @@ export default function VideoMetadata({
             
             {/* Quality Options */}
             <div>
-              <Label className="block text-sm font-medium text-gray-700 mb-3">Download Quality</Label>
-              <RadioGroup value={selectedQuality} onValueChange={handleQualityChange}>
-                <div className="space-y-2">
+              <Label className="block text-sm font-medium text-gray-700 mb-3">Select Download Quality</Label>
+              <Select value={selectedQuality} onValueChange={handleQualityChange}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Choose video quality..." />
+                </SelectTrigger>
+                <SelectContent>
                   {videoInfo.formats?.map((format: any, index: number) => (
-                    <div key={index} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
-                      <div className="flex items-center space-x-3">
-                        <RadioGroupItem value={format.quality} id={`format-${index}`} />
-                        <Label htmlFor={`format-${index}`} className="cursor-pointer">
-                          <div>
-                            <span className="font-medium text-gray-900">{format.quality} {format.format.toUpperCase()}</span>
-                            <p className="text-sm text-gray-500">{format.size}</p>
-                          </div>
-                        </Label>
+                    <SelectItem key={index} value={format.quality}>
+                      <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center space-x-2">
+                          <Download className="h-4 w-4 text-gray-500" />
+                          <span className="font-medium">{format.quality}</span>
+                          <span className="text-sm text-gray-500">({format.format.toUpperCase()})</span>
+                        </div>
+                        <div className="flex items-center space-x-2 ml-4">
+                          <span className="text-sm text-gray-500">{format.size}</span>
+                          {index === 0 && (
+                            <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
+                              Best
+                            </Badge>
+                          )}
+                        </div>
                       </div>
-                      {index === 0 && (
-                        <Badge variant="default" className="bg-green-100 text-green-800">
-                          Recommended
-                        </Badge>
-                      )}
-                    </div>
+                    </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+              
+              {selectedQuality && (
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <Download className="h-4 w-4 text-blue-600" />
+                    <span className="text-sm font-medium text-blue-800">
+                      Selected: {selectedQuality}
+                    </span>
+                    {videoInfo.formats?.find((f: any) => f.quality === selectedQuality) && (
+                      <span className="text-sm text-blue-600">
+                        • {videoInfo.formats.find((f: any) => f.quality === selectedQuality).size}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </RadioGroup>
+              )}
             </div>
           </div>
         </div>
