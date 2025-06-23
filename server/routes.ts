@@ -156,6 +156,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Download file endpoint
+  app.get("/api/download/:id/file", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const download = await storage.getDownload(id);
+      
+      if (!download || download.status !== "completed") {
+        return res.status(404).json({ message: "Download not found or not completed" });
+      }
+
+      // Re-download the video for immediate streaming
+      const info = await ytdl.getInfo(download.url);
+      const allFormats = info.formats || [];
+      
+      let format;
+      if (download.quality.includes('Audio')) {
+        const audioFormats = allFormats.filter((f: any) => f.hasAudio && !f.hasVideo);
+        format = audioFormats.sort((a: any, b: any) => (b.audioBitrate || 0) - (a.audioBitrate || 0))[0];
+      } else {
+        format = allFormats.find((f: any) => 
+          f.hasVideo && f.hasAudio && 
+          (f.qualityLabel === download.quality || f.quality === download.quality)
+        ) || allFormats.find((f: any) => f.hasVideo && f.hasAudio);
+      }
+
+      if (!format) {
+        return res.status(404).json({ message: "Video format not available" });
+      }
+
+      // Set appropriate headers for file download
+      const filename = `${download.title.replace(/[^a-zA-Z0-9]/g, '_')}.${format.container || 'mp4'}`;
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Type', format.mimeType || 'video/mp4');
+      
+      // Stream the video directly to the response
+      const videoStream = ytdl.downloadFromInfo(info, { format });
+      videoStream.pipe(res);
+      
+      videoStream.on('error', (error) => {
+        console.error('Streaming error:', error);
+        if (!res.headersSent) {
+          res.status(500).json({ message: "Error streaming video" });
+        }
+      });
+      
+    } catch (error) {
+      console.error("Error downloading file:", error);
+      res.status(500).json({ message: "Failed to download file" });
+    }
+  });
+
   // Clear download history
   app.delete("/api/downloads", async (req, res) => {
     try {
@@ -195,37 +246,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Starting download for quality: ${quality}, itag: ${format.itag}`);
 
-      // Simulate download progress since we're not actually saving files
-      let progress = 0;
-      const downloadInterval = setInterval(async () => {
-        progress += Math.floor(Math.random() * 15) + 5; // Random increment between 5-20%
-        
-        if (progress >= 100) {
-          progress = 100;
-          clearInterval(downloadInterval);
-          
-          await storage.updateDownload(downloadId, {
-            status: "completed",
-            progress: 100,
-            downloadSpeed: undefined,
-            timeRemaining: undefined,
-          });
-          
-          console.log(`Download completed for ID: ${downloadId}`);
-        } else {
-          const speed = `${Math.floor(Math.random() * 500) + 100} KB/s`;
-          const remaining = Math.floor((100 - progress) / 10);
-          const timeRemaining = `${Math.floor(remaining / 60)}m ${remaining % 60}s`;
+      // Get the video stream
+      const stream = ytdl.downloadFromInfo(info, { format });
+      const chunks: Buffer[] = [];
+      let totalSize = parseInt(format.contentLength || '0');
+      let downloaded = 0;
 
-          await storage.updateDownload(downloadId, {
-            progress,
-            downloadSpeed: speed,
-            timeRemaining,
-          });
-          
-          console.log(`Download progress for ID ${downloadId}: ${progress}%`);
-        }
-      }, 1000);
+      stream.on('data', async (chunk: Buffer) => {
+        chunks.push(chunk);
+        downloaded += chunk.length;
+        
+        const progress = totalSize > 0 ? Math.round((downloaded / totalSize) * 100) : 0;
+        const speed = `${Math.round(chunk.length / 1024)} KB/s`;
+        const remaining = totalSize > 0 ? Math.round((totalSize - downloaded) / (chunk.length * 1000)) : 0;
+        const timeRemaining = `${Math.floor(remaining / 60)}m ${remaining % 60}s`;
+
+        await storage.updateDownload(downloadId, {
+          progress,
+          downloadSpeed: speed,
+          timeRemaining,
+        });
+      });
+
+      stream.on('end', async () => {
+        const videoBuffer = Buffer.concat(chunks);
+        
+        // Store the video data temporarily for download
+        await storage.updateDownload(downloadId, {
+          status: "completed",
+          progress: 100,
+          downloadSpeed: undefined,
+          timeRemaining: undefined,
+          fileSize: `${Math.round(videoBuffer.length / 1024 / 1024)} MB`,
+        });
+        
+        console.log(`Download completed for ID: ${downloadId}, Size: ${videoBuffer.length} bytes`);
+      });
+
+      stream.on('error', async (error) => {
+        console.error("Download error:", error);
+        await storage.updateDownload(downloadId, {
+          status: "failed",
+        });
+      });
 
     } catch (error) {
       console.error("Download process error:", error);

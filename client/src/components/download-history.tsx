@@ -144,6 +144,23 @@ export default function DownloadHistory() {
                         : download.status.charAt(0).toUpperCase() + download.status.slice(1)
                       }
                     </Badge>
+                    {download.status === "completed" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          const link = document.createElement('a');
+                          link.href = `/api/download/${download.id}/file`;
+                          link.download = '';
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                        }}
+                        className="text-xs px-2 py-1 h-6"
+                      >
+                        <Download className="h-3 w-3" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>

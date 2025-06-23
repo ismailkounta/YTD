@@ -122,9 +122,28 @@ export default function DownloadPanel({ videoInfo, selectedQuality, selectedForm
             <Alert className="bg-green-50 border-green-200">
               <CheckCircle className="h-4 w-4 text-green-600" />
               <AlertDescription className="text-green-600">
-                <span className="font-medium">Download Complete!</span>
-                <br />
-                Video saved to your downloads folder
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="font-medium">Download Complete!</span>
+                    <br />
+                    Ready to download to your device
+                  </div>
+                  <Button
+                    onClick={() => {
+                      const link = document.createElement('a');
+                      link.href = `/api/download/${currentDownloadId}/file`;
+                      link.download = '';
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                    }}
+                    size="sm"
+                    className="ml-4 bg-green-600 hover:bg-green-700"
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Download File
+                  </Button>
+                </div>
               </AlertDescription>
             </Alert>
           )}
