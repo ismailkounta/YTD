@@ -186,9 +186,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Set appropriate headers for file download
-      const filename = `${download.title.replace(/[^a-zA-Z0-9]/g, '_')}.${format.container || 'mp4'}`;
+      const filename = `${download.title.replace(/[^a-zA-Z0-9\s]/g, '_').trim()}.${format.container || 'mp4'}`;
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.setHeader('Content-Type', format.mimeType || 'video/mp4');
+      res.setHeader('Content-Length', format.contentLength || '0');
+      res.setHeader('Accept-Ranges', 'bytes');
       
       // Stream the video directly to the response
       const videoStream = ytdl.downloadFromInfo(info, { format });

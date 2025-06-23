@@ -130,12 +130,7 @@ export default function DownloadPanel({ videoInfo, selectedQuality, selectedForm
                   </div>
                   <Button
                     onClick={() => {
-                      const link = document.createElement('a');
-                      link.href = `/api/download/${currentDownloadId}/file`;
-                      link.download = '';
-                      document.body.appendChild(link);
-                      link.click();
-                      document.body.removeChild(link);
+                      window.open(`/api/download/${currentDownloadId}/file`, '_blank');
                     }}
                     size="sm"
                     className="ml-4 bg-green-600 hover:bg-green-700"
