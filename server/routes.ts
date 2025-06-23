@@ -20,33 +20,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const info = await ytdl.getInfo(url);
       const videoDetails = info.videoDetails;
 
+      // Debug: Log available formats to understand the structure
+      console.log('Total formats available:', info.formats?.length);
+      console.log('Sample format:', info.formats?.[0]);
+
       // Get available formats from the info object
       const allFormats = info.formats || [];
       
-      // Filter for video+audio formats and remove duplicates by quality
-      const videoFormats = allFormats.filter((format: any) => 
-        format.hasVideo && format.hasAudio && format.qualityLabel
-      );
+      // Get all video formats (including adaptive formats)
+      const videoFormats = allFormats.filter((format: any) => {
+        return format.hasVideo && (format.hasAudio || format.audioEncoding);
+      });
       
-      // Remove duplicate qualities and sort by quality (highest first)
+      // Also get adaptive video formats that might have higher qualities
+      const adaptiveVideoFormats = allFormats.filter((format: any) => {
+        return format.hasVideo && !format.hasAudio && format.qualityLabel;
+      });
+      
+      // Combine both types and remove duplicates by quality
+      const combinedFormats = [...videoFormats, ...adaptiveVideoFormats];
       const uniqueQualities = new Map();
-      videoFormats.forEach((format: any) => {
-        const quality = format.qualityLabel;
-        if (!uniqueQualities.has(quality)) {
+      
+      combinedFormats.forEach((format: any) => {
+        const quality = format.qualityLabel || format.quality;
+        if (quality && !uniqueQualities.has(quality)) {
           uniqueQualities.set(quality, format);
         }
       });
       
       // Sort qualities in descending order (1080p, 720p, 480p, etc.)
       const sortedFormats = Array.from(uniqueQualities.values()).sort((a: any, b: any) => {
-        const aHeight = parseInt(a.qualityLabel?.replace('p', '') || '0');
-        const bHeight = parseInt(b.qualityLabel?.replace('p', '') || '0');
+        const aQuality = a.qualityLabel || a.quality || '0p';
+        const bQuality = b.qualityLabel || b.quality || '0p';
+        const aHeight = parseInt(aQuality.replace('p', '').replace(/\D/g, '') || '0');
+        const bHeight = parseInt(bQuality.replace('p', '').replace(/\D/g, '') || '0');
         return bHeight - aHeight;
       });
       
+      console.log('Processed formats:', sortedFormats.map(f => ({ quality: f.qualityLabel || f.quality, hasVideo: f.hasVideo, hasAudio: f.hasAudio })));
+      
       const formats = sortedFormats.map((format: any) => ({
-        quality: format.qualityLabel,
-        format: format.container || 'mp4',
+        quality: format.qualityLabel || format.quality,
+        format: format.container || format.mimeType?.split('/')[1]?.split(';')[0] || 'mp4',
         size: format.contentLength ? `~${Math.round(parseInt(format.contentLength) / 1024 / 1024)} MB` : 'Unknown',
         itag: format.itag,
       }));
